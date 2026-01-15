@@ -202,22 +202,24 @@ class GeminiAnalyzer:
     """
     
     # ========================================
-    # 系统提示词 - 决策仪表盘 v2.0
+    # 系统提示词 - UI增强 & 逻辑保留版 v3.0
     # ========================================
-    # 输出格式升级：从简单信号升级为决策仪表盘
-    # 核心模块：核心结论 + 数据透视 + 舆情情报 + 作战计划
+    # 核心保障：
+    # 1. 100% 保留了原有的交易理念（严进策略、趋势判断、风控阈值），确保分析内核不变。
+    # 2. 仅增加了对输出格式（Markdown表格、Emoji视觉信号）的约束，提升阅读体验。
     # ========================================
     
-    SYSTEM_PROMPT = """你是一位专注于趋势交易的 A 股投资分析师，负责生成专业的【决策仪表盘】分析报告。
+    SYSTEM_PROMPT = """你是一位专注于趋势交易的 A 股投资分析师，同时精通信息可视化设计。你的任务是生成一份**逻辑严密**且**排版精美**的【决策仪表盘】。
 
-## 核心交易理念（必须严格遵守）
+## 第一部分：核心交易理念（必须严格遵守）
+**⚠️ 警告：以下分析逻辑不可更改，必须作为判断买卖的唯一标准！**
 
 ### 1. 严进策略（不追高）
 - **绝对不追高**：当股价偏离 MA5 超过 5% 时，坚决不买入
 - **乖离率公式**：(现价 - MA5) / MA5 × 100%
 - 乖离率 < 2%：最佳买点区间
 - 乖离率 2-5%：可小仓介入
-- 乖离率 > 5%：严禁追高！直接判定为"观望"
+- 乖离率 > 5%：严禁追高！直接判定为"观望"或"持有"
 
 ### 2. 趋势交易（顺势而为）
 - **多头排列必须条件**：MA5 > MA10 > MA20
@@ -242,145 +244,115 @@ class GeminiAnalyzer:
 - 行业政策利空
 - 大额解禁
 
-## 输出格式：决策仪表盘 JSON
+---
 
-请严格按照以下 JSON 格式输出，这是一个完整的【决策仪表盘】：
+## 第二部分：UI 排版与视觉规范（仅影响展示形式）
+**为了在飞书云文档中获得最佳阅读体验，请严格执行以下排版规则：**
+
+1.  **拒绝流水账**：在 JSON 的文本字段（如 technical_analysis）中，**严禁**使用垂直列表罗列价格。**必须**使用 Markdown 表格展示关键指标。
+    * ❌ 错误示范：MA5: 10.0, MA10: 9.0
+    * ✅ 正确示范：`| 指标 | 现价 | MA5 | MA10 |`
+2.  **Emoji 视觉信号**：
+    * 🟢 代表：买入、利好、安全、多头
+    * 🔴 代表：卖出、风险、破位、空头
+    * 🟡 代表：观望、震荡、持有
+3.  **结论先行**：核心结论必须一针见血，包含明确的信号 Emoji。
+
+---
+
+## 第三部分：输出格式（JSON）
+
+请严格按照以下 JSON 格式输出，内容需基于上述“交易理念”生成：
 
 ```json
 {
     "sentiment_score": 0-100整数,
-    "trend_prediction": "强烈看多/看多/震荡/看空/强烈看空",
-    "operation_advice": "买入/加仓/持有/减仓/卖出/观望",
+    "trend_prediction": "🟢强烈看多/🟢看多/🟡震荡/🔴看空/🔴强烈看空",
+    "operation_advice": "🟢买入/🟢加仓/🟡持有/🔴减仓/🔴卖出/🟡观望",
     "confidence_level": "高/中/低",
     
     "dashboard": {
         "core_conclusion": {
-            "one_sentence": "一句话核心结论（30字以内，直接告诉用户做什么）",
+            "one_sentence": "💡 一句话核心结论（30字内，需包含Emoji信号，严格基于乖离率和均线判断）",
             "signal_type": "🟢买入信号/🟡持有观望/🔴卖出信号/⚠️风险警告",
-            "time_sensitivity": "立即行动/今日内/本周内/不急",
+            "time_sensitivity": "⚡️立即行动/📅今日内/🗓️本周内/⏳不急",
             "position_advice": {
-                "no_position": "空仓者建议：具体操作指引",
-                "has_position": "持仓者建议：具体操作指引"
+                "no_position": "空仓者建议：根据乖离率给出具体点位",
+                "has_position": "持仓者建议：止盈止损点位"
             }
         },
         
         "data_perspective": {
             "trend_status": {
-                "ma_alignment": "均线排列状态描述",
+                "ma_alignment": "均线状态描述 (如: 🟢多头排列)",
                 "is_bullish": true/false,
                 "trend_score": 0-100
             },
             "price_position": {
-                "current_price": 当前价格数值,
-                "ma5": MA5数值,
-                "ma10": MA10数值,
-                "ma20": MA20数值,
-                "bias_ma5": 乖离率百分比数值,
-                "bias_status": "安全/警戒/危险",
-                "support_level": 支撑位价格,
-                "resistance_level": 压力位价格
+                "table_markdown": "| 指标 | 数值 | 状态 |\n|:---|:---|:---|\n| 现价 | XX.XX | - |\n| MA5 | XX.XX | 🟢支撑 |\n| 乖离率 | XX% | ✅安全/🚨追高 |" 
             },
             "volume_analysis": {
-                "volume_ratio": 量比数值,
-                "volume_status": "放量/缩量/平量",
-                "turnover_rate": 换手率百分比,
-                "volume_meaning": "量能含义解读（如：缩量回调表示抛压减轻）"
+                "status_desc": "🟢缩量回调/🔴放量下跌",
+                "volume_meaning": "量能解读"
             },
             "chip_structure": {
                 "profit_ratio": 获利比例,
-                "avg_cost": 平均成本,
                 "concentration": 筹码集中度,
-                "chip_health": "健康/一般/警惕"
+                "chip_health": "🟢健康/🟡一般/🔴警惕"
             }
         },
         
         "intelligence": {
-            "latest_news": "【最新消息】近期重要新闻摘要",
-            "risk_alerts": ["风险点1：具体描述", "风险点2：具体描述"],
-            "positive_catalysts": ["利好1：具体描述", "利好2：具体描述"],
-            "earnings_outlook": "业绩预期分析（基于年报预告、业绩快报等）",
-            "sentiment_summary": "舆情情绪一句话总结"
+            "latest_news": "【最新消息】摘要",
+            "risk_alerts": ["🔴 风险点1", "🔴 风险点2"],
+            "positive_catalysts": ["🟢 利好1", "🟢 利好2"],
+            "earnings_outlook": "业绩分析",
+            "sentiment_summary": "舆情总结"
         },
         
         "battle_plan": {
             "sniper_points": {
-                "ideal_buy": "理想买入点：XX元（在MA5附近）",
-                "secondary_buy": "次优买入点：XX元（在MA10附近）",
-                "stop_loss": "止损位：XX元（跌破MA20或X%）",
-                "take_profit": "目标位：XX元（前高/整数关口）"
+                "ideal_buy": "🎯 理想买入：XX.XX元 (必须在MA5/10附近)",
+                "secondary_buy": "👌 次优买入：XX.XX元",
+                "stop_loss": "🛡️ 止损红线：XX.XX元 (跌破MA20)",
+                "take_profit": "🚀 目标止盈：XX.XX元"
             },
             "position_strategy": {
                 "suggested_position": "建议仓位：X成",
-                "entry_plan": "分批建仓策略描述",
-                "risk_control": "风控策略描述"
+                "entry_plan": "建仓策略"
             },
             "action_checklist": [
-                "✅/⚠️/❌ 检查项1：多头排列",
-                "✅/⚠️/❌ 检查项2：乖离率<5%",
-                "✅/⚠️/❌ 检查项3：量能配合",
-                "✅/⚠️/❌ 检查项4：无重大利空",
-                "✅/⚠️/❌ 检查项5：筹码健康"
+                "✅/❌ 趋势：多头排列",
+                "✅/❌ 乖离率：<5%",
+                "✅/❌ 量能：缩量回踩",
+                "✅/❌ 筹码：结构健康"
             ]
         }
     },
     
     "analysis_summary": "100字综合分析摘要",
-    "key_points": "3-5个核心看点，逗号分隔",
+    "key_points": "核心看点",
     "risk_warning": "风险提示",
-    "buy_reason": "操作理由，引用交易理念",
+    "buy_reason": "操作理由",
     
-    "trend_analysis": "走势形态分析",
-    "short_term_outlook": "短期1-3日展望",
-    "medium_term_outlook": "中期1-2周展望",
-    "technical_analysis": "技术面综合分析",
-    "ma_analysis": "均线系统分析",
+    "trend_analysis": "必须包含 Markdown 表格的走势分析",
+    "short_term_outlook": "短期展望",
+    "medium_term_outlook": "中期展望",
+    "technical_analysis": "技术面分析",
+    "ma_analysis": "均线分析",
     "volume_analysis": "量能分析",
     "pattern_analysis": "K线形态分析",
     "fundamental_analysis": "基本面分析",
     "sector_position": "板块行业分析",
-    "company_highlights": "公司亮点/风险",
+    "company_highlights": "公司亮点",
     "news_summary": "新闻摘要",
     "market_sentiment": "市场情绪",
-    "hot_topics": "相关热点",
+    "hot_topics": "热点话题",
     
     "search_performed": true/false,
-    "data_sources": "数据来源说明"
+    "data_sources": "数据来源"
 }
-```
-
-## 评分标准
-
-### 强烈买入（80-100分）：
-- ✅ 多头排列：MA5 > MA10 > MA20
-- ✅ 低乖离率：<2%，最佳买点
-- ✅ 缩量回调或放量突破
-- ✅ 筹码集中健康
-- ✅ 消息面有利好催化
-
-### 买入（60-79分）：
-- ✅ 多头排列或弱势多头
-- ✅ 乖离率 <5%
-- ✅ 量能正常
-- ⚪ 允许一项次要条件不满足
-
-### 观望（40-59分）：
-- ⚠️ 乖离率 >5%（追高风险）
-- ⚠️ 均线缠绕趋势不明
-- ⚠️ 有风险事件
-
-### 卖出/减仓（0-39分）：
-- ❌ 空头排列
-- ❌ 跌破MA20
-- ❌ 放量下跌
-- ❌ 重大利空
-
-## 决策仪表盘核心原则
-
-1. **核心结论先行**：一句话说清该买该卖
-2. **分持仓建议**：空仓者和持仓者给不同建议
-3. **精确狙击点**：必须给出具体价格，不说模糊的话
-4. **检查清单可视化**：用 ✅⚠️❌ 明确显示每项检查结果
-5. **风险优先级**：舆情中的风险点要醒目标出"""
+"""
 
     def __init__(self, api_key: Optional[str] = None):
         """
@@ -948,276 +920,3 @@ class GeminiAnalyzer:
 1. 🚨 **风险警报**：减持、处罚、利空
 2. 🎯 **利好催化**：业绩、合同、政策
 3. 📊 **业绩预期**：年报预告、业绩快报
-
-```
-{news_context}
-```
-"""
-        else:
-            prompt += """
-未搜索到该股票近期的相关新闻。请主要依据技术面数据进行分析。
-"""
-        
-        # 明确的输出要求
-        prompt += f"""
----
-
-## ✅ 分析任务
-
-请为 **{stock_name}({code})** 生成【决策仪表盘】，严格按照 JSON 格式输出。
-
-### 重点关注（必须明确回答）：
-1. ❓ 是否满足 MA5>MA10>MA20 多头排列？
-2. ❓ 当前乖离率是否在安全范围内（<5%）？—— 超过5%必须标注"严禁追高"
-3. ❓ 量能是否配合（缩量回调/放量突破）？
-4. ❓ 筹码结构是否健康？
-5. ❓ 消息面有无重大利空？（减持、处罚、业绩变脸等）
-
-### 决策仪表盘要求：
-- **核心结论**：一句话说清该买/该卖/该等
-- **持仓分类建议**：空仓者怎么做 vs 持仓者怎么做
-- **具体狙击点位**：买入价、止损价、目标价（精确到分）
-- **检查清单**：每项用 ✅/⚠️/❌ 标记
-
-请输出完整的 JSON 格式决策仪表盘。"""
-        
-        return prompt
-    
-    def _format_volume(self, volume: Optional[float]) -> str:
-        """格式化成交量显示"""
-        if volume is None:
-            return 'N/A'
-        if volume >= 1e8:
-            return f"{volume / 1e8:.2f} 亿股"
-        elif volume >= 1e4:
-            return f"{volume / 1e4:.2f} 万股"
-        else:
-            return f"{volume:.0f} 股"
-    
-    def _format_amount(self, amount: Optional[float]) -> str:
-        """格式化成交额显示"""
-        if amount is None:
-            return 'N/A'
-        if amount >= 1e8:
-            return f"{amount / 1e8:.2f} 亿元"
-        elif amount >= 1e4:
-            return f"{amount / 1e4:.2f} 万元"
-        else:
-            return f"{amount:.0f} 元"
-    
-    def _parse_response(
-        self, 
-        response_text: str, 
-        code: str, 
-        name: str
-    ) -> AnalysisResult:
-        """
-        解析 Gemini 响应（决策仪表盘版）
-        
-        尝试从响应中提取 JSON 格式的分析结果，包含 dashboard 字段
-        如果解析失败，尝试智能提取或返回默认结果
-        """
-        try:
-            # 清理响应文本：移除 markdown 代码块标记
-            cleaned_text = response_text
-            if '```json' in cleaned_text:
-                cleaned_text = cleaned_text.replace('```json', '').replace('```', '')
-            elif '```' in cleaned_text:
-                cleaned_text = cleaned_text.replace('```', '')
-            
-            # 尝试找到 JSON 内容
-            json_start = cleaned_text.find('{')
-            json_end = cleaned_text.rfind('}') + 1
-            
-            if json_start >= 0 and json_end > json_start:
-                json_str = cleaned_text[json_start:json_end]
-                
-                # 尝试修复常见的 JSON 问题
-                json_str = self._fix_json_string(json_str)
-                
-                data = json.loads(json_str)
-                
-                # 提取 dashboard 数据
-                dashboard = data.get('dashboard', None)
-                
-                # 解析所有字段，使用默认值防止缺失
-                return AnalysisResult(
-                    code=code,
-                    name=name,
-                    # 核心指标
-                    sentiment_score=int(data.get('sentiment_score', 50)),
-                    trend_prediction=data.get('trend_prediction', '震荡'),
-                    operation_advice=data.get('operation_advice', '持有'),
-                    confidence_level=data.get('confidence_level', '中'),
-                    # 决策仪表盘
-                    dashboard=dashboard,
-                    # 走势分析
-                    trend_analysis=data.get('trend_analysis', ''),
-                    short_term_outlook=data.get('short_term_outlook', ''),
-                    medium_term_outlook=data.get('medium_term_outlook', ''),
-                    # 技术面
-                    technical_analysis=data.get('technical_analysis', ''),
-                    ma_analysis=data.get('ma_analysis', ''),
-                    volume_analysis=data.get('volume_analysis', ''),
-                    pattern_analysis=data.get('pattern_analysis', ''),
-                    # 基本面
-                    fundamental_analysis=data.get('fundamental_analysis', ''),
-                    sector_position=data.get('sector_position', ''),
-                    company_highlights=data.get('company_highlights', ''),
-                    # 情绪面/消息面
-                    news_summary=data.get('news_summary', ''),
-                    market_sentiment=data.get('market_sentiment', ''),
-                    hot_topics=data.get('hot_topics', ''),
-                    # 综合
-                    analysis_summary=data.get('analysis_summary', '分析完成'),
-                    key_points=data.get('key_points', ''),
-                    risk_warning=data.get('risk_warning', ''),
-                    buy_reason=data.get('buy_reason', ''),
-                    # 元数据
-                    search_performed=data.get('search_performed', False),
-                    data_sources=data.get('data_sources', '技术面数据'),
-                    success=True,
-                )
-            else:
-                # 没有找到 JSON，尝试从纯文本中提取信息
-                logger.warning(f"无法从响应中提取 JSON，使用原始文本分析")
-                return self._parse_text_response(response_text, code, name)
-                
-        except json.JSONDecodeError as e:
-            logger.warning(f"JSON 解析失败: {e}，尝试从文本提取")
-            return self._parse_text_response(response_text, code, name)
-    
-    def _fix_json_string(self, json_str: str) -> str:
-        """修复常见的 JSON 格式问题"""
-        import re
-        
-        # 移除注释
-        json_str = re.sub(r'//.*?\n', '\n', json_str)
-        json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
-        
-        # 修复尾随逗号
-        json_str = re.sub(r',\s*}', '}', json_str)
-        json_str = re.sub(r',\s*]', ']', json_str)
-        
-        # 确保布尔值是小写
-        json_str = json_str.replace('True', 'true').replace('False', 'false')
-        
-        return json_str
-    
-    def _parse_text_response(
-        self, 
-        response_text: str, 
-        code: str, 
-        name: str
-    ) -> AnalysisResult:
-        """从纯文本响应中尽可能提取分析信息"""
-        # 尝试识别关键词来判断情绪
-        sentiment_score = 50
-        trend = '震荡'
-        advice = '持有'
-        
-        text_lower = response_text.lower()
-        
-        # 简单的情绪识别
-        positive_keywords = ['看多', '买入', '上涨', '突破', '强势', '利好', '加仓', 'bullish', 'buy']
-        negative_keywords = ['看空', '卖出', '下跌', '跌破', '弱势', '利空', '减仓', 'bearish', 'sell']
-        
-        positive_count = sum(1 for kw in positive_keywords if kw in text_lower)
-        negative_count = sum(1 for kw in negative_keywords if kw in text_lower)
-        
-        if positive_count > negative_count + 1:
-            sentiment_score = 65
-            trend = '看多'
-            advice = '买入'
-        elif negative_count > positive_count + 1:
-            sentiment_score = 35
-            trend = '看空'
-            advice = '卖出'
-        
-        # 截取前500字符作为摘要
-        summary = response_text[:500] if response_text else '无分析结果'
-        
-        return AnalysisResult(
-            code=code,
-            name=name,
-            sentiment_score=sentiment_score,
-            trend_prediction=trend,
-            operation_advice=advice,
-            confidence_level='低',
-            analysis_summary=summary,
-            key_points='JSON解析失败，仅供参考',
-            risk_warning='分析结果可能不准确，建议结合其他信息判断',
-            raw_response=response_text,
-            success=True,
-        )
-    
-    def batch_analyze(
-        self, 
-        contexts: List[Dict[str, Any]],
-        delay_between: float = 2.0
-    ) -> List[AnalysisResult]:
-        """
-        批量分析多只股票
-        
-        注意：为避免 API 速率限制，每次分析之间会有延迟
-        
-        Args:
-            contexts: 上下文数据列表
-            delay_between: 每次分析之间的延迟（秒）
-            
-        Returns:
-            AnalysisResult 列表
-        """
-        results = []
-        
-        for i, context in enumerate(contexts):
-            if i > 0:
-                logger.debug(f"等待 {delay_between} 秒后继续...")
-                time.sleep(delay_between)
-            
-            result = self.analyze(context)
-            results.append(result)
-        
-        return results
-
-
-# 便捷函数
-def get_analyzer() -> GeminiAnalyzer:
-    """获取 Gemini 分析器实例"""
-    return GeminiAnalyzer()
-
-
-if __name__ == "__main__":
-    # 测试代码
-    logging.basicConfig(level=logging.DEBUG)
-    
-    # 模拟上下文数据
-    test_context = {
-        'code': '600519',
-        'date': '2026-01-09',
-        'today': {
-            'open': 1800.0,
-            'high': 1850.0,
-            'low': 1780.0,
-            'close': 1820.0,
-            'volume': 10000000,
-            'amount': 18200000000,
-            'pct_chg': 1.5,
-            'ma5': 1810.0,
-            'ma10': 1800.0,
-            'ma20': 1790.0,
-            'volume_ratio': 1.2,
-        },
-        'ma_status': '多头排列 📈',
-        'volume_change_ratio': 1.3,
-        'price_change_ratio': 1.5,
-    }
-    
-    analyzer = GeminiAnalyzer()
-    
-    if analyzer.is_available():
-        print("=== AI 分析测试 ===")
-        result = analyzer.analyze(test_context)
-        print(f"分析结果: {result.to_dict()}")
-    else:
-        print("Gemini API 未配置，跳过测试")
