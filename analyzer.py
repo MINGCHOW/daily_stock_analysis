@@ -920,3 +920,273 @@ class GeminiAnalyzer:
 1. 🚨 **风险警报**：减持、处罚、利空
 2. 🎯 **利好催化**：业绩、合同、政策
 3. 📊 **业绩预期**：年报预告、业绩快报
+
+"""
+        else:
+            prompt += """
+未搜索到该股票近期的相关新闻。请主要依据技术面数据进行分析。
+"""
+        
+        # 明确的输出要求
+        prompt += f"""
+---
+
+## ✅ 分析任务
+
+请为 **{stock_name}({code})** 生成【决策仪表盘】，严格按照 JSON 格式输出。
+
+### 重点关注（必须明确回答）：
+1. ❓ 是否满足 MA5>MA10>MA20 多头排列？
+2. ❓ 当前乖离率是否在安全范围内（<5%）？—— 超过5%必须标注"严禁追高"
+3. ❓ 量能是否配合（缩量回调/放量突破）？
+4. ❓ 筹码结构是否健康？
+5. ❓ 消息面有无重大利空？（减持、处罚、业绩变脸等）
+
+### 决策仪表盘要求：
+- **核心结论**：一句话说清该买/该卖/该等
+- **持仓分类建议**：空仓者怎么做 vs 持仓者怎么做
+- **具体狙击点位**：买入价、止损价、目标价（精确到分）
+- **检查清单**：每项用 ✅/⚠️/❌ 标记
+
+请输出完整的 JSON 格式决策仪表盘。"""
+        
+        return prompt
+    
+    def _format_volume(self, volume: Optional[float]) -> str:
+        """格式化成交量显示"""
+        if volume is None:
+            return 'N/A'
+        if volume >= 1e8:
+            return f"{volume / 1e8:.2f} 亿股"
+        elif volume >= 1e4:
+            return f"{volume / 1e4:.2f} 万股"
+        else:
+            return f"{volume:.0f} 股"
+    
+    def _format_amount(self, amount: Optional[float]) -> str:
+        """格式化成交额显示"""
+        if amount is None:
+            return 'N/A'
+        if amount >= 1e8:
+            return f"{amount / 1e8:.2f} 亿元"
+        elif amount >= 1e4:
+            return f"{amount / 1e4:.2f} 万元"
+        else:
+            return f"{amount:.0f} 元"
+    
+    def _parse_response(
+        self, 
+        response_text: str, 
+        code: str, 
+        name: str
+    ) -> AnalysisResult:
+        """
+        解析 Gemini 响应（决策仪表盘版）
+        
+        尝试从响应中提取 JSON 格式的分析结果，包含 dashboard 字段
+        如果解析失败，尝试智能提取或返回默认结果
+        """
+        try:
+            # 清理响应文本：移除 markdown 代码块标记
+            cleaned_text = response_text
+            if '```json' in cleaned_text:
+                cleaned_text = cleaned_text.replace('```json', '').replace('```', '')
+            elif '```' in cleaned_text:
+                cleaned_text = cleaned_text.replace('```', '')
+            
+            # 尝试找到 JSON 内容
+            json_start = cleaned_text.find('{')
+            json_end = cleaned_text.rfind('}') + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_str = cleaned_text[json_start:json_end]
+                
+                # 尝试修复常见的 JSON 问题
+                json_str = self._fix_json_string(json_str)
+                
+                data = json.loads(json_str)
+                
+                # 提取 dashboard 数据
+                dashboard = data.get('dashboard', None)
+                
+                # 解析所有字段，使用默认值防止缺失
+                return AnalysisResult(
+                    code=code,
+                    name=name,
+                    # 核心指标
+                    sentiment_score=int(data.get('sentiment_score', 50)),
+                    trend_prediction=data.get('trend_prediction', '震荡'),
+                    operation_advice=data.get('operation_advice', '持有'),
+                    confidence_level=data.get('confidence_level', '中'),
+                    # 决策仪表盘
+                    dashboard=dashboard,
+                    # 走势分析
+                    trend_analysis=data.get('trend_analysis', ''),
+                    short_term_outlook=data.get('short_term_outlook', ''),
+                    medium_term_outlook=data.get('medium_term_outlook', ''),
+                    # 技术面
+                    technical_analysis=data.get('technical_analysis', ''),
+                    ma_analysis=data.get('ma_analysis', ''),
+                    volume_analysis=data.get('volume_analysis', ''),
+                    pattern_analysis=data.get('pattern_analysis', ''),
+                    # 基本面
+                    fundamental_analysis=data.get('fundamental_analysis', ''),
+                    sector_position=data.get('sector_position', ''),
+                    company_highlights=data.get('company_highlights', ''),
+                    # 情绪面/消息面
+                    news_summary=data.get('news_summary', ''),
+                    market_sentiment=data.get('market_sentiment', ''),
+                    hot_topics=data.get('hot_topics', ''),
+                    # 综合
+                    analysis_summary=data.get('analysis_summary', '分析完成'),
+                    key_points=data.get('key_points', ''),
+                    risk_warning=data.get('risk_warning', ''),
+                    buy_reason=data.get('buy_reason', ''),
+                    # 元数据
+                    search_performed=data.get('search_performed', False),
+                    data_sources=data.get('data_sources', '技术面数据'),
+                    success=True,
+                )
+            else:
+                # 没有找到 JSON，尝试从纯文本中提取信息
+                logger.warning(f"无法从响应中提取 JSON，使用原始文本分析")
+                return self._parse_text_response(response_text, code, name)
+                
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON 解析失败: {e}，尝试从文本提取")
+            return self._parse_text_response(response_text, code, name)
+    
+    def _fix_json_string(self, json_str: str) -> str:
+        """修复常见的 JSON 格式问题"""
+        import re
+        
+        # 移除注释
+        json_str = re.sub(r'//.*?\n', '\n', json_str)
+        json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+        
+        # 修复尾随逗号
+        json_str = re.sub(r',\s*}', '}', json_str)
+        json_str = re.sub(r',\s*]', ']', json_str)
+        
+        # 确保布尔值是小写
+        json_str = json_str.replace('True', 'true').replace('False', 'false')
+        
+        return json_str
+    
+    def _parse_text_response(
+        self, 
+        response_text: str, 
+        code: str, 
+        name: str
+    ) -> AnalysisResult:
+        """从纯文本响应中尽可能提取分析信息"""
+        # 尝试识别关键词来判断情绪
+        sentiment_score = 50
+        trend = '震荡'
+        advice = '持有'
+        
+        text_lower = response_text.lower()
+        
+        # 简单的情绪识别
+        positive_keywords = ['看多', '买入', '上涨', '突破', '强势', '利好', '加仓', 'bullish', 'buy']
+        negative_keywords = ['看空', '卖出', '下跌', '跌破', '弱势', '利空', '减仓', 'bearish', 'sell']
+        
+        positive_count = sum(1 for kw in positive_keywords if kw in text_lower)
+        negative_count = sum(1 for kw in negative_keywords if kw in text_lower)
+        
+        if positive_count > negative_count + 1:
+            sentiment_score = 65
+            trend = '看多'
+            advice = '买入'
+        elif negative_count > positive_count + 1:
+            sentiment_score = 35
+            trend = '看空'
+            advice = '卖出'
+        
+        # 截取前500字符作为摘要
+        summary = response_text[:500] if response_text else '无分析结果'
+        
+        return AnalysisResult(
+            code=code,
+            name=name,
+            sentiment_score=sentiment_score,
+            trend_prediction=trend,
+            operation_advice=advice,
+            confidence_level='低',
+            analysis_summary=summary,
+            key_points='JSON解析失败，仅供参考',
+            risk_warning='分析结果可能不准确，建议结合其他信息判断',
+            raw_response=response_text,
+            success=True,
+        )
+    
+    def batch_analyze(
+        self, 
+        contexts: List[Dict[str, Any]],
+        delay_between: float = 2.0
+    ) -> List[AnalysisResult]:
+        """
+        批量分析多只股票
+        
+        注意：为避免 API 速率限制，每次分析之间会有延迟
+        
+        Args:
+            contexts: 上下文数据列表
+            delay_between: 每次分析之间的延迟（秒）
+            
+        Returns:
+            AnalysisResult 列表
+        """
+        results = []
+        
+        for i, context in enumerate(contexts):
+            if i > 0:
+                logger.debug(f"等待 {delay_between} 秒后继续...")
+                time.sleep(delay_between)
+            
+            result = self.analyze(context)
+            results.append(result)
+        
+        return results
+
+
+# 便捷函数
+def get_analyzer() -> GeminiAnalyzer:
+    """获取 Gemini 分析器实例"""
+    return GeminiAnalyzer()
+
+
+if __name__ == "__main__":
+    # 测试代码
+    logging.basicConfig(level=logging.DEBUG)
+    
+    # 模拟上下文数据
+    test_context = {
+        'code': '600519',
+        'date': '2026-01-09',
+        'today': {
+            'open': 1800.0,
+            'high': 1850.0,
+            'low': 1780.0,
+            'close': 1820.0,
+            'volume': 10000000,
+            'amount': 18200000000,
+            'pct_chg': 1.5,
+            'ma5': 1810.0,
+            'ma10': 1800.0,
+            'ma20': 1790.0,
+            'volume_ratio': 1.2,
+        },
+        'ma_status': '多头排列 📈',
+        'volume_change_ratio': 1.3,
+        'price_change_ratio': 1.5,
+    }
+    
+    analyzer = GeminiAnalyzer()
+    
+    if analyzer.is_available():
+        print("=== AI 分析测试 ===")
+        result = analyzer.analyze(test_context)
+        print(f"分析结果: {result.to_dict()}")
+    else:
+        print("Gemini API 未配置，跳过测试")
