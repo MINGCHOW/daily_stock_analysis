@@ -6,7 +6,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
 
-> 🤖 基于 AI 大模型的 A 股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/邮箱
+> 🤖 基于 AI 大模型的 A/H 股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/邮箱
 
 ![运行效果演示](./sources/all_2026-01-13_221547.gif)
 
@@ -147,6 +147,15 @@
 ## ⚙️ 配置说明
 
 > 📖 完整环境变量、定时任务配置请参考 [完整配置指南](docs/full-guide.md)
+
+## 🖥️ 本地 WebUI（可选）
+
+本地运行时，可启用简易 WebUI 来方便查看/修改 `.env` 里的自选股列表。
+
+- 启动命令：`python main.py --webui`
+- 访问地址：`http://127.0.0.1:8000`
+- 详细说明请参考 [配置指南 - WebUI](docs/full-guide.md#本地-webui-管理界面)
+
 ## 📁 项目结构
 
 ```
@@ -198,7 +207,7 @@ daily_stock_analysis/
 - [x] 定时推送
 - [x] GitHub Actions
 - [x] 港股支持
-- [ ] Web 管理界面
+- [x] Web 管理界面 (简易版)
 - [ ] 历史分析回测
 - [ ] 美股支持
 
@@ -235,3 +244,15 @@ daily_stock_analysis/
 ---
 
 **如果觉得有用，请给个 ⭐ Star 支持一下！**
+
+<!-- 赞赏锚点 -->
+<a id="sponsor"></a>
+###### ☕ 请我喝杯咖啡
+- 如果觉得本项目对你有帮助且行有余力，可以请我喝杯咖啡，支持项目的持续维护与迭代；不赞赏也完全不影响使用。   
+<small>（赞赏时可备注联系方式，方便私信致谢与后续交流反馈）</small>
+- 感谢支持, 祝您股市长虹，拿主力当提款机。
+
+<div align="center">
+  <img src="./sources/wechatpay.jpg" alt="WeChat Pay" width="200" style="margin-right: 20px;">
+  <img src="./sources/alipay.jpg" alt="Alipay" width="200">
+</div>
